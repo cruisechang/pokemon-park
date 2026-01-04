@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>寶可夢像素樂園 - 玩具派對版 (物理修正)</title>
+    <title>寶可夢像素樂園 - 物理完美版</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=DotGothic16&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -74,7 +74,7 @@
         .toy-ball {
             position: absolute; font-size: 28px; z-index: 8;
             cursor: grab;
-            transition: transform 0.1s linear;
+            transition: transform 0.1s linear; /* 平滑旋轉 */
             filter: drop-shadow(2px 4px 2px rgba(0,0,0,0.4));
         }
         .toy-ball:active { cursor: grabbing; }
@@ -271,8 +271,10 @@
             this.x = x; this.y = y;
             this.width = 30; this.height = 30;
             this.vx = 0; this.vy = 0;
-            // 修正 1: 摩擦力加大 (0.95 -> 0.92) 讓球更容易停下
-            this.friction = 0.92; 
+            
+            // 修正 1: 極大摩擦力 (0.88)，讓球在草地上很快停下
+            this.friction = 0.88; 
+            
             this.el = document.createElement('div');
             this.el.className = 'toy-ball';
             this.el.innerText = '⚽';
@@ -285,20 +287,45 @@
         update() {
             if (this.isDragging) return;
 
+            // 物理運動
             this.x += this.vx;
             this.y += this.vy;
             
+            // 摩擦力減速
             this.vx *= this.friction;
             this.vy *= this.friction;
 
+            // 修正 2: 強制速限 (Speed Cap)
+            // 防止球速過快飛出畫面
+            const MAX_SPEED = 12; // 最大速度
+            const speed = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
+            if (speed > MAX_SPEED) {
+                const ratio = MAX_SPEED / speed;
+                this.vx *= ratio;
+                this.vy *= ratio;
+            }
+
+            // 停止極小數值
             if (Math.abs(this.vx) < 0.1) this.vx = 0;
             if (Math.abs(this.vy) < 0.1) this.vy = 0;
 
-            // 修正 2: 撞牆反彈減弱 (-0.8 -> -0.6)
-            if (this.x <= 0) { this.x = 0; this.vx *= -0.6; }
-            if (this.x >= stageWidth - this.width) { this.x = stageWidth - this.width; this.vx *= -0.6; }
-            if (this.y <= 0) { this.y = 0; this.vy *= -0.6; }
-            if (this.y >= stageHeight - this.height) { this.y = stageHeight - this.height; this.vy *= -0.6; }
+            // 邊界檢查 (防止穿牆)
+            if (this.x <= 0) { 
+                this.x = 0; 
+                this.vx = Math.abs(this.vx) * 0.6; // 確保彈回
+            }
+            if (this.x >= stageWidth - this.width) { 
+                this.x = stageWidth - this.width; 
+                this.vx = -Math.abs(this.vx) * 0.6; 
+            }
+            if (this.y <= 0) { 
+                this.y = 0; 
+                this.vy = Math.abs(this.vy) * 0.6; 
+            }
+            if (this.y >= stageHeight - this.height) { 
+                this.y = stageHeight - this.height; 
+                this.vy = -Math.abs(this.vy) * 0.6; 
+            }
 
             this.render();
         }
@@ -425,9 +452,9 @@
                 this.vy = Math.sin(angle) * this.speed;
 
                 if (minDist < 40 && this.kickCooldown === 0) {
-                    // 修正 3: 寶可夢踢球力道減弱 (8 -> 6)
-                    nearestBall.vx = Math.cos(angle) * 6; 
-                    nearestBall.vy = Math.sin(angle) * 6;
+                    // 修正 3: 溫柔踢球 (力道減半)
+                    nearestBall.vx = Math.cos(angle) * 4; 
+                    nearestBall.vy = Math.sin(angle) * 4;
                     this.kickCooldown = 60; 
                     this.playCry(); 
                 }
@@ -524,9 +551,9 @@
             ny = Math.max(0, Math.min(ny, stageHeight - activeDragBall.height));
             activeDragBall.x = nx; activeDragBall.y = ny; 
             
-            // 修正 4: 投擲靈敏度大減 (0.5 -> 0.15) 讓球不會飛太快
-            activeDragBall.vx = (e.movementX) * 0.15;
-            activeDragBall.vy = (e.movementY) * 0.15;
+            // 修正 4: 手動丟球力道微調 (更自然)
+            activeDragBall.vx = (e.movementX) * 0.1;
+            activeDragBall.vy = (e.movementY) * 0.1;
             
             activeDragBall.render();
         }
