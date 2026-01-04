@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>寶可夢像素樂園 - 玩具派對版</title>
+    <title>寶可夢像素樂園 - 玩具派對版 (物理修正)</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=DotGothic16&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -102,7 +102,7 @@
         button:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0px #333; }
         
         #feedBtn { background: #ff99cc; color: #330033; }
-        #toyBtn { background: #66ccff; color: #003366; } /* 新按鈕顏色 */
+        #toyBtn { background: #66ccff; color: #003366; }
 
         .status-led {
             width: 10px; height: 10px; background-color: red; border-radius: 50%;
@@ -150,7 +150,8 @@
         <input type="text" id="pokeName" placeholder="例如: 皮卡丘, 傑尼龜" value="皮卡丘">
         <button id="summonBtn">召喚</button>
         <button id="feedBtn">餵食</button>
-        <button id="toyBtn">玩具</button> <button id="clearBtn" style="background:#ff5555; color:white;">清除</button>
+        <button id="toyBtn">玩具</button>
+        <button id="clearBtn" style="background:#ff5555; color:white;">清除</button>
     </div>
     
     <div style="margin-top: 10px; font-size: 12px; color: #666; text-align: right; line-height: 1.5;">
@@ -199,7 +200,7 @@
     // --- State ---
     let pokemons = [];
     let foods = [];
-    let balls = []; // 儲存玩具球
+    let balls = []; 
     let particles = [];
     let ctxBg = BG_CANVAS.getContext('2d');
     let ctxFx = FX_CANVAS.getContext('2d');
@@ -264,13 +265,14 @@
         remove() { this.el.remove(); }
     }
 
-    // --- Class: ToyBall (New) ---
+    // --- Class: ToyBall (Physic Fixes) ---
     class ToyBall {
         constructor(x, y) {
             this.x = x; this.y = y;
             this.width = 30; this.height = 30;
             this.vx = 0; this.vy = 0;
-            this.friction = 0.95; // 摩擦力
+            // 修正 1: 摩擦力加大 (0.95 -> 0.92) 讓球更容易停下
+            this.friction = 0.92; 
             this.el = document.createElement('div');
             this.el.className = 'toy-ball';
             this.el.innerText = '⚽';
@@ -283,23 +285,20 @@
         update() {
             if (this.isDragging) return;
 
-            // 物理運動
             this.x += this.vx;
             this.y += this.vy;
             
-            // 摩擦力減速
             this.vx *= this.friction;
             this.vy *= this.friction;
 
-            // 停止極小數值
             if (Math.abs(this.vx) < 0.1) this.vx = 0;
             if (Math.abs(this.vy) < 0.1) this.vy = 0;
 
-            // 邊界反彈
-            if (this.x <= 0) { this.x = 0; this.vx *= -0.8; }
-            if (this.x >= stageWidth - this.width) { this.x = stageWidth - this.width; this.vx *= -0.8; }
-            if (this.y <= 0) { this.y = 0; this.vy *= -0.8; }
-            if (this.y >= stageHeight - this.height) { this.y = stageHeight - this.height; this.vy *= -0.8; }
+            // 修正 2: 撞牆反彈減弱 (-0.8 -> -0.6)
+            if (this.x <= 0) { this.x = 0; this.vx *= -0.6; }
+            if (this.x >= stageWidth - this.width) { this.x = stageWidth - this.width; this.vx *= -0.6; }
+            if (this.y <= 0) { this.y = 0; this.vy *= -0.6; }
+            if (this.y >= stageHeight - this.height) { this.y = stageHeight - this.height; this.vy *= -0.6; }
 
             this.render();
         }
@@ -333,8 +332,6 @@
             this.speed = this.baseSpeed;
             this.state = 'idle'; 
             this.direction = 1; this.moveTimer = 0;
-            
-            // 踢球冷卻時間
             this.kickCooldown = 0;
 
             this.el = document.createElement('img');
@@ -383,11 +380,6 @@
             this.speed = isNight ? this.baseSpeed * 0.5 : this.baseSpeed;
             if (this.kickCooldown > 0) this.kickCooldown--;
 
-            // 優先級：
-            // 1. 進食
-            // 2. 玩球 (如果附近有球)
-            // 3. 睡覺/閒逛
-
             if (foods.length > 0 && this.state !== 'eating' && this.state !== 'sleeping') {
                 this.handleFeedingLogic();
             } 
@@ -406,7 +398,6 @@
                 this.x += this.vx || 0; this.y += this.vy || 0;
             }
 
-            // 邊界
             if (this.x <= 0) { this.x = 0; this.vx *= -1; }
             if (this.x >= stageWidth - this.width) { this.x = stageWidth - this.width; this.vx *= -1; }
             if (this.y <= 0) { this.y = 0; this.vy *= -1; }
@@ -419,9 +410,8 @@
         }
 
         handleBallPlaying() {
-            // 找最近的球
             let nearestBall = null;
-            let minDist = 200; // 視力範圍
+            let minDist = 200; 
 
             balls.forEach(ball => {
                 const dist = Math.sqrt((ball.x - this.x)**2 + (ball.y - this.y)**2);
@@ -429,19 +419,17 @@
             });
 
             if (nearestBall) {
-                // 如果球太遠，只是偶爾去看，如果球近就去踢
                 this.state = 'chasing_ball';
                 const angle = Math.atan2(nearestBall.y - this.y, nearestBall.x - this.x);
                 this.vx = Math.cos(angle) * this.speed;
                 this.vy = Math.sin(angle) * this.speed;
 
-                // 碰撞檢測 (踢球)
                 if (minDist < 40 && this.kickCooldown === 0) {
-                    // 踢！
-                    nearestBall.vx = Math.cos(angle) * 8; // 給球速度
-                    nearestBall.vy = Math.sin(angle) * 8;
-                    this.kickCooldown = 60; // 踢完休息一下
-                    this.playCry(); // 興奮叫一聲
+                    // 修正 3: 寶可夢踢球力道減弱 (8 -> 6)
+                    nearestBall.vx = Math.cos(angle) * 6; 
+                    nearestBall.vy = Math.sin(angle) * 6;
+                    this.kickCooldown = 60; 
+                    this.playCry(); 
                 }
             } else {
                 if (this.state === 'chasing_ball') this.state = 'idle';
@@ -514,7 +502,7 @@
         }
     }
 
-    // --- Drag Logic (Unified) ---
+    // --- Drag Logic ---
     let activeDrag = null;
     let activeDragBall = null;
 
@@ -536,9 +524,9 @@
             ny = Math.max(0, Math.min(ny, stageHeight - activeDragBall.height));
             activeDragBall.x = nx; activeDragBall.y = ny; 
             
-            // 計算投擲速度
-            activeDragBall.vx = (e.movementX) * 0.5;
-            activeDragBall.vy = (e.movementY) * 0.5;
+            // 修正 4: 投擲靈敏度大減 (0.5 -> 0.15) 讓球不會飛太快
+            activeDragBall.vx = (e.movementX) * 0.15;
+            activeDragBall.vy = (e.movementY) * 0.15;
             
             activeDragBall.render();
         }
@@ -641,7 +629,7 @@
         ctxFx.clearRect(0, 0, stageWidth, stageHeight);
         
         pokemons.forEach(p => p.update());
-        balls.forEach(b => b.update()); // 更新球
+        balls.forEach(b => b.update());
 
         for (let i = particles.length - 1; i >= 0; i--) {
             particles[i].update(); particles[i].draw(ctxFx);
@@ -652,11 +640,11 @@
 
     document.getElementById('summonBtn').addEventListener('click', summonPokemon);
     document.getElementById('feedBtn').addEventListener('click', spawnFood); 
-    document.getElementById('toyBtn').addEventListener('click', spawnToy); // 新增監聽
+    document.getElementById('toyBtn').addEventListener('click', spawnToy); 
     document.getElementById('clearBtn').addEventListener('click', () => {
         pokemons.forEach(p => { p.el.remove(); p.tooltip.remove(); });
         foods.forEach(f => f.remove());
-        balls.forEach(b => b.remove()); // 清除球
+        balls.forEach(b => b.remove());
         pokemons = []; foods = []; balls = [];
         currentBgColor = '#74c365';
         drawBackground();
@@ -667,7 +655,6 @@
     loop();
     INPUT.value = '皮卡丘'; 
     setTimeout(summonPokemon, 500);
-    // 預設給一顆球
     setTimeout(spawnToy, 1000);
 </script>
 </body>
